@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>9D5953C2-A1FF-477E-9E54-13BCC84305B7</string>
+	<key>IDESourceControlProjectName</key>
+	<string>ActiveWindowUnderCursor</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>8FFDC04CB66DFF2E1D63247D700CBB4466EE3328</key>
+		<string>https://github.com/revintec/ActiveWindowUnderCursor.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>ActiveWindowUnderCursor.xcodeproj</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>8FFDC04CB66DFF2E1D63247D700CBB4466EE3328</key>
+		<string>../..</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://github.com/revintec/ActiveWindowUnderCursor.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>111</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>8FFDC04CB66DFF2E1D63247D700CBB4466EE3328</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>8FFDC04CB66DFF2E1D63247D700CBB4466EE3328</string>
+			<key>IDESourceControlWCCName</key>
+			<string>ActiveWindowUnderCursor</string>
+		</dict>
+	</array>
+</dict>
+</plist>
