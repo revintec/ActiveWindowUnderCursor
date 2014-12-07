@@ -48,7 +48,7 @@ int main(int argc,const char*argv[]){
         cc(!AXIsProcessTrusted());
         NSPoint point=[NSEvent mouseLocation];
         cc(!carbonScreenPointFromCocoaScreenPoint(&point));
-        AXUIElementRef window,application;
+        AXUIElementRef sheet=nil,window,application;
         cc(AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),point.x,point.y,&window));
         while(true){
             CFTypeRef role,prole;
@@ -61,25 +61,37 @@ int main(int argc,const char*argv[]){
             }else if([(NSString*)kAXRadioButtonRole isEqual:(__bridge id)(role)]){
                 if([(NSString*)kAXTabGroupRole isEqual:(__bridge id)(prole)])
                     cc(AXUIElementPerformAction(window,kAXPressAction));
+            }else if([(NSString*)kAXSheetRole isEqual:(__bridge id)(role)]){
+                if([(NSString*)kAXWindowRole isEqual:(__bridge id)(prole)])
+                    sheet=window;
             }window=application;
         }
-        pid_t pid;ProcessSerialNumber psn;
-        cc(AXUIElementGetPid(application,&pid));
-        cc(GetProcessForPID(pid,&psn));
-        cc(AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
-        
-        // BUG FIX: some apps can't receive keystrokes while they're not foreground
-        // There is, however, another approach: instead of sending CMD-W, click the close button
-        // of the tab instead, and if there is no tabs left, click the close button of the window
-        for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
-            CFTypeRef isfg;cc(AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
-            if(kCFBooleanTrue!=isfg)
-                cc(AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
-            else break;
-            [NSThread sleepForTimeInterval:0.1];
+        Boolean attw;
+        if(!sheet){
+            CFTypeRef title;cc(AXUIElementCopyAttributeValue(application,kAXTitleAttribute,&title));
+            NSArray*items=@[@"QREncoder",@"FileZilla"];
+            if([items containsObject:(__bridge id)(title)])attw=false;
+            else cc(AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
+        }else attw=true;
+        if(attw){
+            pid_t pid;ProcessSerialNumber psn;
+            cc(AXUIElementGetPid(application,&pid));
+            cc(GetProcessForPID(pid,&psn));
+            cc(AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
+            // BUG FIX: some apps can't receive keystrokes while they're not foreground
+            // There is, however, another approach: instead of sending CMD-W, click the close button
+            // of the tab instead, and if there is no tabs left, click the close button of the window
+            for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
+                CFTypeRef isfg;cc(AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
+                if(kCFBooleanTrue!=isfg)
+                    cc(AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
+                else break;
+                [NSThread sleepForTimeInterval:0.1];
+            }// END BUG FIX
+            strokeKeycodeWithCMD(&psn,sheet?kVK_ANSI_Period:kVK_ANSI_W);
+        }else{
+            cc(AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,(CFTypeRef*)&window));
+            cc(AXUIElementPerformAction(window,kAXPressAction));
         }
-        
-        strokeKeycodeWithCMD(&psn,kVK_ANSI_W);
-        return 0;
-    }
+    }//return 0;
 }
