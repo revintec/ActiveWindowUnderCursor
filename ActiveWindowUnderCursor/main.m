@@ -72,6 +72,7 @@ int main(int argc,const char*argv[]){
 #define MODE_TAB_NEXT 2
 #define MODE_TAB_CLSE 3
 #define MODE_TAB_MIDD 4
+#define MODE_WIN_ZOOM 5
     @autoreleasepool{
         cc(argc!=2||!AXIsProcessTrusted());
         int mode;
@@ -81,6 +82,7 @@ int main(int argc,const char*argv[]){
             case 'x':mode=MODE_TAB_CLSE;break;
             case '_':cc(true);mode=MODE_TAB_MIDD;break; // CenterMouse click just not working...
             case '>':mode=MODE_TAB_NEXT;break;
+            case '+':mode=MODE_WIN_ZOOM;break;
             default:cc(true);mode=0;// mode=0 is used to prevent "uninitialized variable mode" warnings
         }
         NSPoint point=[NSEvent mouseLocation];
@@ -103,47 +105,57 @@ int main(int argc,const char*argv[]){
                     sheet=window;
             }window=application;
         }
-        Boolean attw;
-        if(!sheet){
-            CFTypeRef title;cc(AXUIElementCopyAttributeValue(application,kAXTitleAttribute,&title));
-            NSArray*items=@[@"QREncoder",@"FileZilla"];
-            if([items containsObject:(__bridge id)(title)])attw=false;
-            else cc(AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
-        }else attw=true;
-        if(attw){
-            pid_t pid;ProcessSerialNumber psn;
-            cc(AXUIElementGetPid(application,&pid));
-            cc(GetProcessForPID(pid,&psn));
-            cc(AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
-            // WORKAROUND: see FIXME in mouseClickWithButton(...)
-            // BUG FIX: some apps can't receive keystrokes and/or mouseclicks while they're not foreground
-            // There is, however, another approach: instead of sending CMD-W, click the close button
-            // of the tab instead, and if there is no tabs left, click the close button of the window
-            for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
-                CFTypeRef isfg;cc(AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
-                if(kCFBooleanTrue!=isfg)
-                    cc(AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
-                else break;
-                [NSThread sleepForTimeInterval:0.1];
-            }// END BUG FIX
-            switch(mode){
-                case MODE_TAB_PREV:
-                    strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl|kCGEventFlagMaskShift,kVK_Tab);
-                    break;
-                case MODE_TAB_CLSE:
-                    strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,sheet?kVK_ANSI_Period:kVK_ANSI_W);
-                    break;
-                case MODE_TAB_MIDD:
-                    mouseClickWithButton(&psn,&point,kCGMouseButtonCenter);
-                    break;
-                case MODE_TAB_NEXT:
-                    strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl,kVK_Tab);
-                    break;
-                default:cc(mode);
+        if(mode==MODE_WIN_ZOOM){
+            cc(AXUIElementCopyAttributeValue(window,kAXZoomButtonAttribute,(CFTypeRef*)&window));
+            AXError error=AXUIElementPerformAction(window,(CFStringRef)@"AXZoomWindow");
+            if(error){
+                CFTypeRef srole;cc(AXUIElementCopyAttributeValue(window,kAXSubroleAttribute,&srole));
+                cc(![(NSString*)kAXZoomButtonSubrole isEqual:(__bridge id)(srole)]);
+                cc(AXUIElementPerformAction(window,kAXPressAction));
             }
-        }else if(mode==MODE_TAB_CLSE){
-            cc(AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,(CFTypeRef*)&window));
-            cc(AXUIElementPerformAction(window,kAXPressAction));
+        }else{
+            Boolean attw;
+            if(!sheet){
+                CFTypeRef title;cc(AXUIElementCopyAttributeValue(application,kAXTitleAttribute,&title));
+                NSArray*items=@[@"QREncoder",@"FileZilla"];
+                if([items containsObject:(__bridge id)(title)])attw=false;
+                else cc(AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
+            }else attw=true;
+            if(attw){
+                pid_t pid;ProcessSerialNumber psn;
+                cc(AXUIElementGetPid(application,&pid));
+                cc(GetProcessForPID(pid,&psn));
+                cc(AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
+                // WORKAROUND: see FIXME in mouseClickWithButton(...)
+                // BUG FIX: some apps can't receive keystrokes and/or mouseclicks while they're not foreground
+                // There is, however, another approach: instead of sending CMD-W, click the close button
+                // of the tab instead, and if there is no tabs left, click the close button of the window
+                for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
+                    CFTypeRef isfg;cc(AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
+                    if(kCFBooleanTrue!=isfg)
+                        cc(AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
+                    else break;
+                    [NSThread sleepForTimeInterval:0.1];
+                }// END BUG FIX
+                switch(mode){
+                    case MODE_TAB_PREV:
+                        strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl|kCGEventFlagMaskShift,kVK_Tab);
+                        break;
+                    case MODE_TAB_CLSE:
+                        strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,sheet?kVK_ANSI_Period:kVK_ANSI_W);
+                        break;
+                    case MODE_TAB_MIDD:
+                        // mouseClickWithButton(&psn,&point,kCGMouseButtonCenter);
+                        break;
+                    case MODE_TAB_NEXT:
+                        strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl,kVK_Tab);
+                        break;
+                    default:cc(mode);
+                }
+            }else if(mode==MODE_TAB_CLSE){
+                cc(AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,(CFTypeRef*)&window));
+                cc(AXUIElementPerformAction(window,kAXPressAction));
+            }
         }
     }//return 0;
 }
