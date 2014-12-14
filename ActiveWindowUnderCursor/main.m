@@ -22,13 +22,14 @@ BOOL carbonScreenPointFromCocoaScreenPoint(NSPoint*cocoaPoint){
     cocoaPoint->y=screenHeight-cocoaPoint->y;
     return true;
 }
-static inline void cc(char*op,long error){
+static inline void _cc(char*op,long error,char*fn,int ln){
     if(!error)return;
-    NSLog(@"%s: %ld",(char*)op,error);
+    NSLog(@"%s: %ld    at %s(line %d)",(char*)op,error,fn,ln);
     AudioServicesPlayAlertSound(kSystemSoundID_UserPreferredAlert);
     sleep(3);
     exit(1);
 }
+#define cc(op,error) _cc(op,error,(char*)__PRETTY_FUNCTION__,__LINE__)
 BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CGKeyCode key){
     CGEventRef kd=CGEventCreateKeyboardEvent(nil,key,true);
     CGEventRef ku=CGEventCreateKeyboardEvent(nil,key,false);
