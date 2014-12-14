@@ -24,7 +24,7 @@ BOOL carbonScreenPointFromCocoaScreenPoint(NSPoint*cocoaPoint){
 }
 static inline void cc(char*op,long error){
     if(!error)return;
-    NSLog(@"%s: %lx (%ld)",(char*)op,error,error);
+    NSLog(@"%s: %ld",(char*)op,error);
     AudioServicesPlayAlertSound(kSystemSoundID_UserPreferredAlert);
     sleep(3);
     exit(1);
@@ -76,15 +76,16 @@ BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CG
 int main(int argc,const char*argv[]){
     @autoreleasepool{
         cc("command args",argc!=2||!AXIsProcessTrusted());
-        int mode;
+        int mode=argv[1][0];
         printf("argc: %d\n",argc);
-        switch(argv[1][0]){
+        switch(mode){
             case '<':mode=MODE_TAB_PREV;break;
             case 'x':mode=MODE_TAB_CLSE;break;
-            case '_':cc("unsupported mode \"_\"",true);mode=MODE_TAB_MIDD;break; // CenterMouse click just not working...
+            case '_':cc("unsupported mode",mode);mode=MODE_TAB_MIDD;break; // CenterMouse click just not working...
             case '>':mode=MODE_TAB_NEXT;break;
             case '+':mode=MODE_WIN_ZOOM;break;
-            default:cc("unknown mode",true);mode=0;// mode=0 is used to prevent "uninitialized variable mode" warnings
+            case  0:cc("ascii \\0",true);
+            default:cc("unknown mode",mode);
         }
         NSPoint point=[NSEvent mouseLocation];
         cc("coordinate conversion",!carbonScreenPointFromCocoaScreenPoint(&point));
@@ -153,7 +154,8 @@ int main(int argc,const char*argv[]){
                     case MODE_TAB_NEXT:
                         strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl,kVK_Tab);
                         break;
-                    default:cc("unknown mode",true);
+                    case  0:cc("mode \\0",true);
+                    default:cc("unknown mode",mode);
                 }
             }else if(mode==MODE_TAB_CLSE){
                 cc("get close button",AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,(CFTypeRef*)&window));
