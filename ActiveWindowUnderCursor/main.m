@@ -76,7 +76,8 @@ BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CG
 #define MODE_WIN_ZOOM 5
 int main(int argc,const char*argv[]){
     @autoreleasepool{
-        cc("command args",argc!=2||!AXIsProcessTrusted());
+        cc("accessibility perm",!AXIsProcessTrusted());
+        cc("command args",argc!=2);
         int mode=argv[1][0];
         printf("argc: %d\n",argc);
         switch(mode){
