@@ -22,8 +22,9 @@ BOOL carbonScreenPointFromCocoaScreenPoint(NSPoint*cocoaPoint){
     cocoaPoint->y=screenHeight-cocoaPoint->y;
     return true;
 }
-static inline void cc(error){
+static inline void cc(char*op,long error){
     if(!error)return;
+    NSLog(@"%s: %lx (%ld)",(char*)op,error,error);
     AudioServicesPlayAlertSound(kSystemSoundID_UserPreferredAlert);
     sleep(3);
     exit(1);
@@ -67,73 +68,75 @@ BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CG
 //    CFRelease(kd);CFRelease(ku);
 //    return true;
 //}
-int main(int argc,const char*argv[]){
 #define MODE_TAB_PREV 1
 #define MODE_TAB_NEXT 2
 #define MODE_TAB_CLSE 3
 #define MODE_TAB_MIDD 4
 #define MODE_WIN_ZOOM 5
+int main(int argc,const char*argv[]){
     @autoreleasepool{
-        cc(argc!=2||!AXIsProcessTrusted());
+        cc("command args",argc!=2||!AXIsProcessTrusted());
         int mode;
         printf("argc: %d\n",argc);
         switch(argv[1][0]){
             case '<':mode=MODE_TAB_PREV;break;
             case 'x':mode=MODE_TAB_CLSE;break;
-            case '_':cc(true);mode=MODE_TAB_MIDD;break; // CenterMouse click just not working...
+            case '_':cc("unsupported mode \"_\"",true);mode=MODE_TAB_MIDD;break; // CenterMouse click just not working...
             case '>':mode=MODE_TAB_NEXT;break;
             case '+':mode=MODE_WIN_ZOOM;break;
-            default:cc(true);mode=0;// mode=0 is used to prevent "uninitialized variable mode" warnings
+            default:cc("unknown mode",true);mode=0;// mode=0 is used to prevent "uninitialized variable mode" warnings
         }
         NSPoint point=[NSEvent mouseLocation];
-        cc(!carbonScreenPointFromCocoaScreenPoint(&point));
+        cc("coordinate conversion",!carbonScreenPointFromCocoaScreenPoint(&point));
         AXUIElementRef sheet=nil,window,application;
-        cc(AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),point.x,point.y,&window));
+        cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),point.x,point.y,&window));
         while(true){
             CFTypeRef role,prole;
-            cc(AXUIElementCopyAttributeValue(window,kAXRoleAttribute,&role));
-            cc(AXUIElementCopyAttributeValue(window,kAXParentAttribute,(CFTypeRef*)&application));
-            cc(AXUIElementCopyAttributeValue(application,kAXRoleAttribute,&prole));
+            cc("loop get role",AXUIElementCopyAttributeValue(window,kAXRoleAttribute,&role));
+            cc("loop get parent",AXUIElementCopyAttributeValue(window,kAXParentAttribute,(CFTypeRef*)&application));
+            cc("loop get prole",AXUIElementCopyAttributeValue(application,kAXRoleAttribute,&prole));
             if([(NSString*)kAXWindowRole isEqual:(__bridge id)(role)]){
                 if([(NSString*)kAXApplicationRole isEqual:(__bridge id)(prole)])
                     break;
             }else if([(NSString*)kAXRadioButtonRole isEqual:(__bridge id)(role)]){
                 if([(NSString*)kAXTabGroupRole isEqual:(__bridge id)(prole)])
-                    cc(AXUIElementPerformAction(window,kAXPressAction));
+                    cc("loop press tab",AXUIElementPerformAction(window,kAXPressAction));
             }else if([(NSString*)kAXSheetRole isEqual:(__bridge id)(role)]){
                 if([(NSString*)kAXWindowRole isEqual:(__bridge id)(prole)])
                     sheet=window;
             }window=application;
         }
         if(mode==MODE_WIN_ZOOM){
-            cc(AXUIElementCopyAttributeValue(window,kAXZoomButtonAttribute,(CFTypeRef*)&window));
+            cc("get zoom button",AXUIElementCopyAttributeValue(window,kAXZoomButtonAttribute,(CFTypeRef*)&window));
             AXError error=AXUIElementPerformAction(window,(CFStringRef)@"AXZoomWindow");
             if(error){
-                CFTypeRef srole;cc(AXUIElementCopyAttributeValue(window,kAXSubroleAttribute,&srole));
-                cc(![(NSString*)kAXZoomButtonSubrole isEqual:(__bridge id)(srole)]);
-                cc(AXUIElementPerformAction(window,kAXPressAction));
+                if(error!=kAXErrorActionUnsupported)
+                    cc("AXZoomWindow",error);
+                CFTypeRef srole;cc("get zoom button srole",AXUIElementCopyAttributeValue(window,kAXSubroleAttribute,&srole));
+                cc("test srole",![(NSString*)kAXZoomButtonSubrole isEqual:(__bridge id)(srole)]);
+                cc("zoom window",AXUIElementPerformAction(window,kAXPressAction));
             }
         }else{
             Boolean attw;
             if(!sheet){
-                CFTypeRef title;cc(AXUIElementCopyAttributeValue(application,kAXTitleAttribute,&title));
+                CFTypeRef title;cc("get title",AXUIElementCopyAttributeValue(application,kAXTitleAttribute,&title));
                 NSArray*items=@[@"QREncoder",@"FileZilla"];
                 if([items containsObject:(__bridge id)(title)])attw=false;
-                else cc(AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
+                else cc("is window main",AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
             }else attw=true;
             if(attw){
                 pid_t pid;ProcessSerialNumber psn;
-                cc(AXUIElementGetPid(application,&pid));
-                cc(GetProcessForPID(pid,&psn));
-                cc(AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
+                cc("get pid",AXUIElementGetPid(application,&pid));
+                cc("get psn",GetProcessForPID(pid,&psn));
+                cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
                 // WORKAROUND: see FIXME in mouseClickWithButton(...)
                 // BUG FIX: some apps can't receive keystrokes and/or mouseclicks while they're not foreground
                 // There is, however, another approach: instead of sending CMD-W, click the close button
                 // of the tab instead, and if there is no tabs left, click the close button of the window
                 for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
-                    CFTypeRef isfg;cc(AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
+                    CFTypeRef isfg;cc("get front",AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
                     if(kCFBooleanTrue!=isfg)
-                        cc(AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
+                        cc("set front",AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
                     else break;
                     [NSThread sleepForTimeInterval:0.1];
                 }// END BUG FIX
@@ -150,11 +153,11 @@ int main(int argc,const char*argv[]){
                     case MODE_TAB_NEXT:
                         strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl,kVK_Tab);
                         break;
-                    default:cc(mode);
+                    default:cc("unknown mode",true);
                 }
             }else if(mode==MODE_TAB_CLSE){
-                cc(AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,(CFTypeRef*)&window));
-                cc(AXUIElementPerformAction(window,kAXPressAction));
+                cc("get close button",AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,(CFTypeRef*)&window));
+                cc("close window",AXUIElementPerformAction(window,kAXPressAction));
             }
         }
     }//return 0;
