@@ -10,6 +10,12 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <Carbon/Carbon.h>
 
+static inline OSStatus _GetProcessForPID(pid_t pid,ProcessSerialNumber*psn){
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    return GetProcessForPID(pid,psn);
+#pragma clang diagnostic pop
+}
 BOOL carbonScreenPointFromCocoaScreenPoint(NSPoint*cocoaPoint){
     NSScreen*foundScreen=nil;
     for(NSScreen*screen in [NSScreen screens]){
@@ -69,6 +75,15 @@ BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CG
 //    CFRelease(kd);CFRelease(ku);
 //    return true;
 //}
+static inline bool applicationToFrontmost(AXUIElementRef application){
+    for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
+        CFTypeRef isfg;cc("get front",AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
+        if(kCFBooleanTrue!=isfg)
+            cc("set front",AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
+        else return true;
+        [NSThread sleepForTimeInterval:0.1];
+    }return false;
+}
 #define MODE_TAB_PREV 1
 #define MODE_TAB_NEXT 2
 #define MODE_TAB_CLSE 3
@@ -109,52 +124,72 @@ int main(int argc,const char*argv[]){
                     sheet=window;
             }window=application;
         }
+        CFTypeRef t;cc("get title",AXUIElementCopyAttributeValue(application,kAXTitleAttribute,&t));
+        NSString*title=(__bridge NSString*)(t);
         if(mode==MODE_WIN_ZOOM){
-            cc("get zoom button",AXUIElementCopyAttributeValue(window,kAXZoomButtonAttribute,(CFTypeRef*)&window));
-            AXError error=AXUIElementPerformAction(window,(CFStringRef)@"AXZoomWindow");
-            if(error){
-                if(error!=kAXErrorActionUnsupported)
-                    cc("AXZoomWindow",error);
-                CFTypeRef srole;cc("get zoom button srole",AXUIElementCopyAttributeValue(window,kAXSubroleAttribute,&srole));
-                cc("test srole",![(NSString*)kAXZoomButtonSubrole isEqual:(__bridge id)(srole)]);
-                cc("zoom window",AXUIElementPerformAction(window,kAXPressAction));
+            if([@"MPlayerX" isEqual:title]){
+                pid_t pid;ProcessSerialNumber psn;
+                cc("get pid",AXUIElementGetPid(application,&pid));
+                cc("get psn",_GetProcessForPID(pid,&psn));
+                cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
+                // BUG FIX:  some apps can't receive keystrokes and/or mouseclicks while they're not foreground
+                // BUG FIX2: [NSScreen mainScreen] consults the window in focus
+                applicationToFrontmost(application);
+                // END BUG FIX
+                CFTypeRef ref;CGRect wrect,srect;
+                cc("get frame",AXUIElementCopyAttributeValue(window,(CFStringRef)@"AXFrame",&ref));
+                cc("get frame as CGRect",!AXValueGetValue(ref,kAXValueCGRectType,&wrect));
+                NSScreen*screen=[NSScreen mainScreen];
+                srect=[screen visibleFrame];
+                if((wrect.origin.x==srect.origin.x&&wrect.size.width==srect.size.width)||
+                   (wrect.origin.y==srect.origin.y&&wrect.size.height==srect.size.height)){
+                    cc("key ⌘1",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_1));
+                }else cc("key ⌘3",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_3));
+            }else{
+                cc("get zoom button",AXUIElementCopyAttributeValue(window,kAXZoomButtonAttribute,(CFTypeRef*)&window));
+                AXError error=AXUIElementPerformAction(window,(CFStringRef)@"AXZoomWindow");
+                if(error){
+                    if(error!=kAXErrorActionUnsupported)
+                        cc("AXZoomWindow",error);
+                    CFTypeRef srole;cc("get zoom button srole",AXUIElementCopyAttributeValue(window,kAXSubroleAttribute,&srole));
+                    cc("test srole",![(NSString*)kAXZoomButtonSubrole isEqual:(__bridge id)(srole)]);
+                    cc("zoom window",AXUIElementPerformAction(window,kAXPressAction));
+                }
             }
         }else{
             Boolean attw;
             if(!sheet){
-                CFTypeRef title;cc("get title",AXUIElementCopyAttributeValue(application,kAXTitleAttribute,&title));
                 NSArray*items=@[@"QREncoder",@"FileZilla"];
-                if([items containsObject:(__bridge id)(title)])attw=false;
-                else cc("is window main",AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
+                if([items containsObject:title])attw=false;
+                else cc("can set main",AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
             }else attw=true;
             if(attw){
                 pid_t pid;ProcessSerialNumber psn;
                 cc("get pid",AXUIElementGetPid(application,&pid));
-                cc("get psn",GetProcessForPID(pid,&psn));
+                cc("get psn",_GetProcessForPID(pid,&psn));
                 cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
                 // WORKAROUND: see FIXME in mouseClickWithButton(...)
                 // BUG FIX: some apps can't receive keystrokes and/or mouseclicks while they're not foreground
                 // There is, however, another approach: instead of sending CMD-W, click the close button
                 // of the tab instead, and if there is no tabs left, click the close button of the window
-                for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
-                    CFTypeRef isfg;cc("get front",AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
-                    if(kCFBooleanTrue!=isfg)
-                        cc("set front",AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
-                    else break;
-                    [NSThread sleepForTimeInterval:0.1];
-                }// END BUG FIX
+                applicationToFrontmost(application);
+                // END BUG FIX
+                bool xcode=[@"Xcode" isEqual:title];
                 switch(mode){
                     case MODE_TAB_PREV:
-                        strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl|kCGEventFlagMaskShift,kVK_Tab);
+                        if(xcode)cc("key ⌘{",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand|kCGEventFlagMaskShift,kVK_ANSI_LeftBracket));
+                        else cc("key ^⇧\\t",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl|kCGEventFlagMaskShift,kVK_Tab));
                         break;
                     case MODE_TAB_CLSE:
-                        strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,sheet?kVK_ANSI_Period:kVK_ANSI_W);
+                        if(sheet)cc("key ⌘.",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_Period));
+                        else cc("key ⌘W",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_W));
                         break;
                     case MODE_TAB_MIDD:
-                        // mouseClickWithButton(&psn,&point,kCGMouseButtonCenter);
+                        // cc !mouseClickWithButton(&psn,&point,kCGMouseButtonCenter);
                         break;
                     case MODE_TAB_NEXT:
-                        strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl,kVK_Tab);
+                        if(xcode)cc("key ⌘}",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand|kCGEventFlagMaskShift,kVK_ANSI_RightBracket));
+                        else cc("key ^\\t",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl,kVK_Tab));
                         break;
                     case  0:cc("mode \\0",true);
                     default:cc("unknown mode",mode);
