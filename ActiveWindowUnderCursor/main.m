@@ -136,11 +136,13 @@ int main(int argc,const char*argv[]){
                 // BUG FIX2: [NSScreen mainScreen] consults the window in focus
                 applicationToFrontmost(application);
                 // END BUG FIX
-                CFTypeRef ref;CGRect wrect,srect;
+                CFTypeRef ref;CGRect wrect,srect,prect;
                 cc("get frame",AXUIElementCopyAttributeValue(window,(CFStringRef)@"AXFrame",&ref));
                 cc("get frame as CGRect",!AXValueGetValue(ref,kAXValueCGRectType,&wrect));
                 NSScreen*screen=[NSScreen mainScreen];
+                prect=[screen frame];
                 srect=[screen visibleFrame];
+                srect.origin.y=prect.size.height-prect.origin.y-(srect.size.height+srect.origin.y);
                 if((wrect.origin.x==srect.origin.x&&wrect.size.width==srect.size.width)||
                    (wrect.origin.y==srect.origin.y&&wrect.size.height==srect.size.height)){
                     cc("key ⌘1",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_1));
