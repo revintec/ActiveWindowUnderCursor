@@ -143,8 +143,11 @@ int main(int argc,const char*argv[]){
                 prect=[screen frame];
                 srect=[screen visibleFrame];
                 srect.origin.y=prect.size.height-prect.origin.y-(srect.size.height+srect.origin.y);
-                if((wrect.origin.x==srect.origin.x&&wrect.size.width==srect.size.width)||
-                   (wrect.origin.y==srect.origin.y&&wrect.size.height==srect.size.height)){
+                if((wrect.origin.x>=0&&wrect.origin.y>=0&&
+                   wrect.origin.x+wrect.size.width<=srect.origin.x+srect.size.width&&
+                   wrect.origin.y+wrect.size.height<=srect.origin.y+srect.size.height)&&
+                   ((wrect.origin.x==srect.origin.x&&wrect.size.width==srect.size.width)||
+                   (wrect.origin.y==srect.origin.y&&wrect.size.height==srect.size.height))){
                     cc("key ⌘1",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_1));
                 }else cc("key ⌘3",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_3));
             }else{
