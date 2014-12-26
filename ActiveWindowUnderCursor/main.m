@@ -28,12 +28,12 @@ BOOL carbonScreenPointFromCocoaScreenPoint(NSPoint*cocoaPoint){
     cocoaPoint->y=screenHeight-cocoaPoint->y;
     return true;
 }
-static inline void _cc(char*op,long error,char*fn,int ln){
+static inline void _cc(char*op,int error,char*fn,int ln){
     if(!error)return;
-    NSLog(@"%s: %ld    at %s(line %d)",(char*)op,error,fn,ln);
+    NSLog(@"%s: %d    at %s(line %d)",(char*)op,error,fn,ln);
     AudioServicesPlayAlertSound(kSystemSoundID_UserPreferredAlert);
     sleep(3);
-    exit(1);
+    exit(error);
 }
 #define cc(op,error) _cc(op,error,(char*)__PRETTY_FUNCTION__,__LINE__)
 BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CGKeyCode key){
@@ -106,8 +106,13 @@ int main(int argc,const char*argv[]){
         }
         NSPoint point=[NSEvent mouseLocation];
         cc("coordinate conversion",!carbonScreenPointFromCocoaScreenPoint(&point));
-        AXUIElementRef sheet=nil,window,application;
+        AXUIElementRef sheet=nil,web=nil,window,application;
         cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),point.x,point.y,&window));
+        pid_t pid;cc("AXUIElementGetPid",AXUIElementGetPid(window,&pid));
+        NSRunningApplication*ra=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+        cc("get NSRunningApplication",ra==nil);
+        NSString*appName=[ra localizedName];
+        bool safari=[@"Safari" isEqual:appName];
         while(true){
             CFTypeRef role,prole;
             cc("loop get role",AXUIElementCopyAttributeValue(window,kAXRoleAttribute,&role));
@@ -117,19 +122,28 @@ int main(int argc,const char*argv[]){
                 if([(NSString*)kAXApplicationRole isEqual:(__bridge id)(prole)])
                     break;
             }else if([(NSString*)kAXRadioButtonRole isEqual:(__bridge id)(role)]){
-                if([(NSString*)kAXTabGroupRole isEqual:(__bridge id)(prole)])
-                    cc("loop press tab",AXUIElementPerformAction(window,kAXPressAction));
+                if([(NSString*)kAXTabGroupRole isEqual:(__bridge id)(prole)]){
+                    if(safari){
+                        // this way we can't get AXWebArea
+                        // so we disable this feature for now
+                        cc("loop press tab, NYI(Safari)",true);
+                    }else cc("loop press tab",AXUIElementPerformAction(window,kAXPressAction));
+                }
             }else if([(NSString*)kAXSheetRole isEqual:(__bridge id)(role)]){
                 if([(NSString*)kAXWindowRole isEqual:(__bridge id)(prole)])
                     sheet=window;
+            }else if(safari&&[@"AXWebArea" isEqual:(__bridge id)(role)]){
+                // AXWebArea may contain other AXWebArea
+                // so only the outer most AXWebArea is relevant
+                // with this information, undo close tab multiple times is possible in Safari
+                // (currently Safari only allow undo the most recent close tab)
+                // won't need this in Chrome since it has the Recent Tabs feature built-in
+                web=window;
             }window=application;
         }
-        CFTypeRef t;cc("get title",AXUIElementCopyAttributeValue(application,kAXTitleAttribute,&t));
-        NSString*title=(__bridge NSString*)(t);
         if(mode==MODE_WIN_ZOOM){
-            if([@"MPlayerX" isEqual:title]){
-                pid_t pid;ProcessSerialNumber psn;
-                cc("get pid",AXUIElementGetPid(application,&pid));
+            if([@"MPlayerX" isEqual:appName]){
+                ProcessSerialNumber psn;
                 cc("get psn",_GetProcessForPID(pid,&psn));
                 cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
                 // BUG FIX:  some apps can't receive keystrokes and/or mouseclicks while they're not foreground
@@ -165,12 +179,11 @@ int main(int argc,const char*argv[]){
             Boolean attw;
             if(!sheet){
                 NSArray*items=@[@"QREncoder",@"FileZilla"];
-                if([items containsObject:title])attw=false;
+                if([items containsObject:appName])attw=false;
                 else cc("can set main",AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
             }else attw=true;
             if(attw){
-                pid_t pid;ProcessSerialNumber psn;
-                cc("get pid",AXUIElementGetPid(application,&pid));
+                ProcessSerialNumber psn;
                 cc("get psn",_GetProcessForPID(pid,&psn));
                 cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
                 // WORKAROUND: see FIXME in mouseClickWithButton(...)
@@ -179,13 +192,22 @@ int main(int argc,const char*argv[]){
                 // of the tab instead, and if there is no tabs left, click the close button of the window
                 applicationToFrontmost(application);
                 // END BUG FIX
-                bool xcode=[@"Xcode" isEqual:title];
+                bool xcode=[@"Xcode" isEqual:appName];
                 switch(mode){
                     case MODE_TAB_PREV:
                         if(xcode)cc("key ⌘{",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand|kCGEventFlagMaskShift,kVK_ANSI_LeftBracket));
                         else cc("key ^⇧\\t",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl|kCGEventFlagMaskShift,kVK_Tab));
                         break;
                     case MODE_TAB_CLSE:
+                        if(safari){
+                            cc("acquire AXWebArea in Safari",web==nil);
+                            CFTypeRef title,url;
+                            AXError error=AXUIElementCopyAttributeValue(web,kAXURLAttribute,&url);
+                            if(!error){
+                                cc("get AXWebArea title",AXUIElementCopyAttributeValue(web,kAXDescriptionAttribute,&title));
+                                NSLog(@"closing tab: %@\n%@",title,url);
+                            }else if(kAXErrorNoValue!=error)cc("get AXWebArea url",error);
+                        }
                         if(sheet)cc("key ⌘.",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_Period));
                         else cc("key ⌘W",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_W));
                         break;
