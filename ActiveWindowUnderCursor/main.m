@@ -178,7 +178,7 @@ int main(int argc,const char*argv[]){
         }else{
             Boolean attw;
             if(!sheet){
-                NSArray*items=@[@"QREncoder",@"FileZilla"];
+                NSArray*items=@[@"QREncoder",@"FileZilla",@"ffplay"];
                 if([items containsObject:appName])attw=false;
                 else cc("can set main",AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
             }else attw=true;
