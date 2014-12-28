@@ -224,8 +224,7 @@ int main(int argc,const char*argv[]){
                         break;
                     case MODE_TAB_CLSE:
                     {
-                        CFTypeRef sheet=nil;
-                        filterSheet(window,&sheet);
+                        CFTypeRef sheet=nil;filterSheet(window,&sheet);
                         if(!sheet){
                             if(safari){
                                 cc("acquire AXWebArea in Safari",web==nil);
@@ -251,8 +250,11 @@ int main(int argc,const char*argv[]){
                     default:cc("unknown mode",mode);
                 }
             }else if(mode==MODE_TAB_CLSE){
-                cc("get close button",AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,(CFTypeRef*)&window));
-                cc("close window",AXUIElementPerformAction(window,kAXPressAction));
+                AXError error;CFTypeRef button;
+                if((error=AXUIElementCopyAttributeValue(window,kAXCancelButtonAttribute,&button))){
+                    if(kAXErrorNoValue!=error)cc("get cancel button",error);
+                    cc("get close button",AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,&button));
+                }cc("close window",AXUIElementPerformAction(button,kAXPressAction));
             }
         }
     }//return 0;
