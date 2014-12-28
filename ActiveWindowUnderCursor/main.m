@@ -223,20 +223,23 @@ int main(int argc,const char*argv[]){
                         else cc("key ^⇧\\t",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskControl|kCGEventFlagMaskShift,kVK_Tab));
                         break;
                     case MODE_TAB_CLSE:
-                        if(safari){
-                            cc("acquire AXWebArea in Safari",web==nil);
-                            CFTypeRef title,url;
-                            AXError error=AXUIElementCopyAttributeValue(web,kAXURLAttribute,&url);
-                            if(!error){
-                                cc("get AXWebArea title",AXUIElementCopyAttributeValue(web,kAXDescriptionAttribute,&title));
-                                NSLog(@"closing tab: %@\n%@",title,url);
-                            }else if(kAXErrorNoValue!=error)cc("get AXWebArea url",error);
-                        }CFTypeRef sheet=nil;filterSheet(window,&sheet);
-                        if(sheet){
-                            if(!strokeCancel(sheet))
-                                cc("key ⌘.",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_Period));
-                        }else cc("key ⌘W",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_W));
+                    {
+                        CFTypeRef sheet=nil;
+                        filterSheet(window,&sheet);
+                        if(!sheet){
+                            if(safari){
+                                cc("acquire AXWebArea in Safari",web==nil);
+                                CFTypeRef title,url;
+                                AXError error=AXUIElementCopyAttributeValue(web,kAXURLAttribute,&url);
+                                if(!error){
+                                    cc("get AXWebArea title",AXUIElementCopyAttributeValue(web,kAXDescriptionAttribute,&title));
+                                    NSLog(@"closing tab: %@\n%@",title,url);
+                                }else if(kAXErrorNoValue!=error)cc("get AXWebArea url",error);
+                            }cc("key ⌘W",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_W));
+                        }else if(!strokeCancel(sheet))
+                            cc("key ⌘.",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_Period));
                         break;
+                    }
                     case MODE_TAB_MIDD:
                         // cc !mouseClickWithButton(&psn,&point,kCGMouseButtonCenter);
                         break;
