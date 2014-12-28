@@ -104,6 +104,8 @@ bool strokeCancel(AXUIElementRef elem){
             if(CFEqual(kAXButtonRole,role)){
                 CFTypeRef title;cc("filter cancel title",AXUIElementCopyAttributeValue(child,kAXTitleAttribute,&title));
                 if(CFEqual(@"Cancel",title)||CFEqual(@"取消",title)){
+                    // sheet animation requires time! too short, you got kAXErrorCannotComplete(busy)
+                    cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(child,1));
                     cc("press cancel",AXUIElementPerformAction(child,kAXPressAction));
                     return true;
                 }// continue
