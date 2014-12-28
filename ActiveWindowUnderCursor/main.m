@@ -84,6 +84,34 @@ static inline bool applicationToFrontmost(AXUIElementRef application){
         [NSThread sleepForTimeInterval:0.1];
     }return false;
 }
+void filterSheet(AXUIElementRef elem,CFTypeRef*sheet){
+    CFTypeRef children;
+    // kAXChildrenAttribute shouldn't return kAXErrorNoValue
+    cc("filter sheet children",AXUIElementCopyAttributeValue(elem,kAXChildrenAttribute,&children));
+    for(CFIndex i=CFArrayGetCount(children)-1;i>=0;--i){
+        CFTypeRef child=CFArrayGetValueAtIndex(children,i);
+        CFTypeRef role;cc("filter sheet role",AXUIElementCopyAttributeValue(child,kAXRoleAttribute,&role));
+        if(CFEqual(kAXSheetRole,role))
+            return filterSheet(*sheet=child,sheet);
+    }
+}
+bool strokeCancel(AXUIElementRef elem){
+    CFTypeRef children;AXError error=AXUIElementCopyAttributeValue(elem,kAXChildrenAttribute,&children);
+    if(!error){
+        for(CFIndex i=CFArrayGetCount(children)-1;i>=0;--i){
+            CFTypeRef child=CFArrayGetValueAtIndex(children,i);
+            CFTypeRef role;cc("filter cancel role",AXUIElementCopyAttributeValue(child,kAXRoleAttribute,&role));
+            if(CFEqual(kAXButtonRole,role)){
+                CFTypeRef title;cc("filter cancel title",AXUIElementCopyAttributeValue(child,kAXTitleAttribute,&title));
+                if(CFEqual(@"Cancel",title)||CFEqual(@"取消",title)){
+                    cc("press cancel",AXUIElementPerformAction(child,kAXPressAction));
+                    return true;
+                }// continue
+            }else if(strokeCancel(child))return true;
+        }
+    }else if(kAXErrorNoValue!=error)cc("filter cancel children",error);
+    return false;
+}
 #define MODE_TAB_PREV 1
 #define MODE_TAB_NEXT 2
 #define MODE_TAB_CLSE 3
@@ -106,7 +134,7 @@ int main(int argc,const char*argv[]){
         }
         NSPoint point=[NSEvent mouseLocation];
         cc("coordinate conversion",!carbonScreenPointFromCocoaScreenPoint(&point));
-        AXUIElementRef sheet=nil,web=nil,window,application;
+        AXUIElementRef web=nil,window,application;
         AXUIElementRef system=AXUIElementCreateSystemWide();
         cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,0.3));
         cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(system,point.x,point.y,&window));
@@ -120,21 +148,18 @@ int main(int argc,const char*argv[]){
             cc("loop get role",AXUIElementCopyAttributeValue(window,kAXRoleAttribute,&role));
             cc("loop get parent",AXUIElementCopyAttributeValue(window,kAXParentAttribute,(CFTypeRef*)&application));
             cc("loop get prole",AXUIElementCopyAttributeValue(application,kAXRoleAttribute,&prole));
-            if([(NSString*)kAXWindowRole isEqual:(__bridge id)(role)]){
-                if([(NSString*)kAXApplicationRole isEqual:(__bridge id)(prole)])
+            if(CFEqual(kAXWindowRole,role)){
+                if(CFEqual(kAXApplicationRole,prole))
                     break;
-            }else if([(NSString*)kAXRadioButtonRole isEqual:(__bridge id)(role)]){
-                if([(NSString*)kAXTabGroupRole isEqual:(__bridge id)(prole)]){
+            }else if(CFEqual(kAXRadioButtonRole,role)){
+                if(CFEqual(kAXTabGroupRole,prole)){
                     if(safari){
                         // this way we can't get AXWebArea
                         // so we disable this feature for now
                         cc("loop press tab, NYI(Safari)",true);
                     }else cc("loop press tab",AXUIElementPerformAction(window,kAXPressAction));
                 }
-            }else if([(NSString*)kAXSheetRole isEqual:(__bridge id)(role)]){
-                if([(NSString*)kAXWindowRole isEqual:(__bridge id)(prole)])
-                    sheet=window;
-            }else if(safari&&[@"AXWebArea" isEqual:(__bridge id)(role)]){
+            }else if(safari&&CFEqual(@"AXWebArea",role)){
                 // AXWebArea may contain other AXWebArea
                 // so only the outer most AXWebArea is relevant
                 // with this information, undo close tab multiple times is possible in Safari
@@ -173,18 +198,15 @@ int main(int argc,const char*argv[]){
                     if(error!=kAXErrorActionUnsupported)
                         cc("AXZoomWindow",error);
                     CFTypeRef srole;cc("get zoom button srole",AXUIElementCopyAttributeValue(window,kAXSubroleAttribute,&srole));
-                    cc("test srole",![(NSString*)kAXZoomButtonSubrole isEqual:(__bridge id)(srole)]);
+                    cc("test srole",!CFEqual(kAXZoomButtonSubrole,srole));
                     cc("zoom window",AXUIElementPerformAction(window,kAXPressAction));
                 }
             }
         }else{
-            Boolean attw;
-            if(!sheet){
-                NSArray*items=@[@"QREncoder",@"FileZilla",@"ffplay"];
-                if([items containsObject:appName])attw=false;
-                else cc("can set main",AXUIElementIsAttributeSettable(window,kAXMainAttribute,&attw));
-            }else attw=true;
-            if(attw){
+            Boolean mayhaveTab;
+            if([@[@"QREncoder",@"FileZilla",@"ffplay"]containsObject:appName])mayhaveTab=false;
+            else cc("can set main",AXUIElementIsAttributeSettable(window,kAXMainAttribute,&mayhaveTab));
+            if(mayhaveTab){
                 ProcessSerialNumber psn;
                 cc("get psn",_GetProcessForPID(pid,&psn));
                 cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
@@ -209,9 +231,11 @@ int main(int argc,const char*argv[]){
                                 cc("get AXWebArea title",AXUIElementCopyAttributeValue(web,kAXDescriptionAttribute,&title));
                                 NSLog(@"closing tab: %@\n%@",title,url);
                             }else if(kAXErrorNoValue!=error)cc("get AXWebArea url",error);
-                        }
-                        if(sheet)cc("key ⌘.",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_Period));
-                        else cc("key ⌘W",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_W));
+                        }CFTypeRef sheet=nil;filterSheet(window,&sheet);
+                        if(sheet){
+                            if(!strokeCancel(sheet))
+                                cc("key ⌘.",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_Period));
+                        }else cc("key ⌘W",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_W));
                         break;
                     case MODE_TAB_MIDD:
                         // cc !mouseClickWithButton(&psn,&point,kCGMouseButtonCenter);
