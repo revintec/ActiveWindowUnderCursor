@@ -107,7 +107,9 @@ int main(int argc,const char*argv[]){
         NSPoint point=[NSEvent mouseLocation];
         cc("coordinate conversion",!carbonScreenPointFromCocoaScreenPoint(&point));
         AXUIElementRef sheet=nil,web=nil,window,application;
-        cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),point.x,point.y,&window));
+        AXUIElementRef system=AXUIElementCreateSystemWide();
+        cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,0.3));
+        cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(system,point.x,point.y,&window));
         pid_t pid;cc("AXUIElementGetPid",AXUIElementGetPid(window,&pid));
         NSRunningApplication*ra=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         cc("get NSRunningApplication",ra==nil);
