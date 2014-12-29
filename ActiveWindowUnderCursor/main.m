@@ -104,8 +104,6 @@ bool strokeCancel(AXUIElementRef elem){
             if(CFEqual(kAXButtonRole,role)){
                 CFTypeRef title;cc("filter cancel title",AXUIElementCopyAttributeValue(child,kAXTitleAttribute,&title));
                 if(CFEqual(@"Cancel",title)||CFEqual(@"取消",title)){
-                    // sheet animation requires time! too short, you got kAXErrorCannotComplete(busy)
-                    cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(child,1));
                     cc("press cancel",AXUIElementPerformAction(child,kAXPressAction));
                     return true;
                 }// continue
@@ -137,9 +135,7 @@ int main(int argc,const char*argv[]){
         NSPoint point=[NSEvent mouseLocation];
         cc("coordinate conversion",!carbonScreenPointFromCocoaScreenPoint(&point));
         AXUIElementRef web=nil,window,application;
-        AXUIElementRef system=AXUIElementCreateSystemWide();
-        cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,0.3));
-        cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(system,point.x,point.y,&window));
+        cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),point.x,point.y,&window));
         pid_t pid;cc("AXUIElementGetPid",AXUIElementGetPid(window,&pid));
         NSRunningApplication*ra=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         cc("get NSRunningApplication",ra==nil);
