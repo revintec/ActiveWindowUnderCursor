@@ -10,6 +10,7 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <Carbon/Carbon.h>
 
+#define AXMessagingTimeout 0.1
 static inline OSStatus _GetProcessForPID(pid_t pid,ProcessSerialNumber*psn){
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -104,7 +105,10 @@ bool strokeCancel(AXUIElementRef elem){
             if(CFEqual(kAXButtonRole,role)){
                 CFTypeRef title;cc("filter cancel title",AXUIElementCopyAttributeValue(child,kAXTitleAttribute,&title));
                 if(CFEqual(@"Cancel",title)||CFEqual(@"取消",title)){
+                    AXUIElementRef system=AXUIElementCreateSystemWide();
+                    cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,1));
                     cc("press cancel",AXUIElementPerformAction(child,kAXPressAction));
+                    cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
                     return true;
                 }// continue
             }else if(strokeCancel(child))return true;
@@ -135,7 +139,9 @@ int main(int argc,const char*argv[]){
         NSPoint point=[NSEvent mouseLocation];
         cc("coordinate conversion",!carbonScreenPointFromCocoaScreenPoint(&point));
         AXUIElementRef web=nil,window,application;
-        cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),point.x,point.y,&window));
+        AXUIElementRef system=AXUIElementCreateSystemWide();
+        cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
+        cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(system,point.x,point.y,&window));
         pid_t pid;cc("AXUIElementGetPid",AXUIElementGetPid(window,&pid));
         NSRunningApplication*ra=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         cc("get NSRunningApplication",ra==nil);
@@ -173,7 +179,7 @@ int main(int argc,const char*argv[]){
                 cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
                 // BUG FIX:  some apps can't receive keystrokes and/or mouseclicks while they're not foreground
                 // BUG FIX2: [NSScreen mainScreen] consults the window in focus
-                applicationToFrontmost(application);
+                cc("applicationToFrontmost",!applicationToFrontmost(application));
                 // END BUG FIX
                 CFTypeRef ref;CGRect wrect,srect,prect;
                 cc("get frame",AXUIElementCopyAttributeValue(window,(CFStringRef)@"AXFrame",&ref));
@@ -191,6 +197,8 @@ int main(int argc,const char*argv[]){
                 }else cc("key ⌘3",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_3));
             }else{
                 cc("get zoom button",AXUIElementCopyAttributeValue(window,kAXZoomButtonAttribute,(CFTypeRef*)&window));
+                AXUIElementRef system=AXUIElementCreateSystemWide();
+                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,1));
                 AXError error=AXUIElementPerformAction(window,(CFStringRef)@"AXZoomWindow");
                 if(error){
                     if(error!=kAXErrorActionUnsupported)
@@ -199,6 +207,7 @@ int main(int argc,const char*argv[]){
                     cc("test srole",!CFEqual(kAXZoomButtonSubrole,srole));
                     cc("zoom window",AXUIElementPerformAction(window,kAXPressAction));
                 }
+                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
             }
         }else{
             Boolean mayhaveTab;
@@ -212,7 +221,7 @@ int main(int argc,const char*argv[]){
                 // BUG FIX: some apps can't receive keystrokes and/or mouseclicks while they're not foreground
                 // There is, however, another approach: instead of sending CMD-W, click the close button
                 // of the tab instead, and if there is no tabs left, click the close button of the window
-                applicationToFrontmost(application);
+                cc("applicationToFrontmost",!applicationToFrontmost(application));
                 // END BUG FIX
                 bool xcode=[@"Xcode" isEqual:appName];
                 switch(mode){
