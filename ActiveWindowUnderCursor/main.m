@@ -78,10 +78,12 @@ BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CG
 //}
 static inline bool applicationToFrontmost(AXUIElementRef application){
     for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
-        CFTypeRef isfg;cc("get front",AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg));
-        if(kCFBooleanTrue!=isfg)
-            cc("set front",AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
-        else return true;
+        CFTypeRef isfg;AXError error=AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg);
+        if(!error){
+            if(kCFBooleanTrue!=isfg)
+                cc("set front",AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
+            else return true;
+        }else if(kAXErrorCannotComplete!=error)cc("get front",error);
         [NSThread sleepForTimeInterval:0.1];
     }return false;
 }
