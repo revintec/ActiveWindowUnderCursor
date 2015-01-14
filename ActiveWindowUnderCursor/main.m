@@ -145,7 +145,10 @@ int main(int argc,const char*argv[]){
         AXUIElementRef web=nil,window,application;
         AXUIElementRef system=AXUIElementCreateSystemWide();
         cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
-        cc("AXUIElementCopyElementAtPosition",AXUIElementCopyElementAtPosition(system,point.x,point.y,&window));
+        extern AXError _AXUIElementCopyElementAtPositionIncludeIgnored(AXUIElementRef root,float x,float y,AXUIElementRef*elem,long includingIgnored,long rcx,long r8,long r9);
+        cc("AXUIElementCopyElementAtPositionEx",_AXUIElementCopyElementAtPositionIncludeIgnored
+           (system,point.x,point.y,&window,false,0,0,0));
+//        CFTypeRef igx;cc("AXIsIgnored",AXUIElementCopyAttributeValue(window,(CFStringRef)@"AXIsIgnored",&igx));NSLog(@"AXIsIgnored: %@",igx);
         pid_t pid;cc("AXUIElementGetPid",AXUIElementGetPid(window,&pid));
         NSRunningApplication*ra=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         cc("get NSRunningApplication",ra==nil);
