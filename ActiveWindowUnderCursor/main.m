@@ -105,7 +105,9 @@ bool strokeCancel(AXUIElementRef elem){
             CFTypeRef child=CFArrayGetValueAtIndex(children,i);
             CFTypeRef role;cc("filter cancel role",AXUIElementCopyAttributeValue(child,kAXRoleAttribute,&role));
             if(CFEqual(kAXButtonRole,role)){
-                CFTypeRef title;cc("filter cancel title",AXUIElementCopyAttributeValue(child,kAXTitleAttribute,&title));
+                CFTypeRef title;AXError error=AXUIElementCopyAttributeValue(child,kAXTitleAttribute,&title);
+                if(kAXErrorAttributeUnsupported!=error)cc("filter cancel title",error);
+                if(error)continue;
                 if(CFEqual(@"Cancel",title)||CFEqual(@"取消",title)){
                     AXUIElementRef system=AXUIElementCreateSystemWide();
                     cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,1));
