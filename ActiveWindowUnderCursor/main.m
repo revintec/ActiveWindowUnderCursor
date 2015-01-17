@@ -150,12 +150,32 @@ int main(int argc,const char*argv[]){
         extern AXError _AXUIElementCopyElementAtPositionIncludeIgnored(AXUIElementRef root,float x,float y,AXUIElementRef*elem,long includingIgnored,long rcx,long r8,long r9);
         cc("AXUIElementCopyElementAtPositionEx",_AXUIElementCopyElementAtPositionIncludeIgnored
            (system,point.x,point.y,&window,false,0,0,0));
-//        CFTypeRef igx;cc("AXIsIgnored",AXUIElementCopyAttributeValue(window,(CFStringRef)@"AXIsIgnored",&igx));NSLog(@"AXIsIgnored: %@",igx);
         pid_t pid;cc("AXUIElementGetPid",AXUIElementGetPid(window,&pid));
         NSRunningApplication*ra=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         cc("get NSRunningApplication",ra==nil);
         NSString*appName=[ra localizedName];
-        bool safari=[@"Safari" isEqual:appName];
+        if(mode==MODE_WIN_ZOOM&&[@"Finder"isEqual:appName]){
+            CFTypeRef value;
+            cc("fast get role",AXUIElementCopyAttributeValue(window,kAXRoleAttribute,&value));
+            if(CFEqual(kAXGroupRole,value)){
+                cc("fast get parent",AXUIElementCopyAttributeValue(window,kAXParentAttribute,(CFTypeRef*)&application));
+                cc("fast get prole",AXUIElementCopyAttributeValue(application,kAXRoleAttribute,&value));
+                if(CFEqual(kAXScrollAreaRole,value)){
+                    cc("fast get desc",AXUIElementCopyAttributeValue(application,kAXDescriptionAttribute,&value));
+                    if(CFEqual(@"desktop",value)){
+                        cc("fast get application",AXUIElementCopyAttributeValue(application,kAXParentAttribute,(CFTypeRef*)&application));
+                        cc("fast get approle",AXUIElementCopyAttributeValue(application,kAXRoleAttribute,&value));
+                        cc("fast check approle",!CFEqual(kAXApplicationRole,value));
+                        applicationToFrontmost(application);
+                        ProcessSerialNumber psn;
+                        cc("get psn",_GetProcessForPID(pid,&psn));
+                        cc("key ⌘N",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_N));
+                        return 0;
+                    }
+                }
+            }
+        }
+        bool safari=[@"Safari"isEqual:appName];
         while(true){
             CFTypeRef role,prole;
             cc("loop get role",AXUIElementCopyAttributeValue(window,kAXRoleAttribute,&role));
@@ -183,8 +203,6 @@ int main(int argc,const char*argv[]){
         }
         if(mode==MODE_WIN_ZOOM){
             if([@"MPlayerX" isEqual:appName]){
-                ProcessSerialNumber psn;
-                cc("get psn",_GetProcessForPID(pid,&psn));
                 cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
                 // BUG FIX:  some apps can't receive keystrokes and/or mouseclicks while they're not foreground
                 // BUG FIX2: [NSScreen mainScreen] consults the window in focus
@@ -197,6 +215,8 @@ int main(int argc,const char*argv[]){
                 prect=[screen frame];
                 srect=[screen visibleFrame];
                 srect.origin.y=prect.size.height-prect.origin.y-(srect.size.height+srect.origin.y);
+                ProcessSerialNumber psn;
+                cc("get psn",_GetProcessForPID(pid,&psn));
                 if((wrect.origin.x>=0&&wrect.origin.y>=0&&
                    wrect.origin.x+wrect.size.width<=srect.origin.x+srect.size.width&&
                    wrect.origin.y+wrect.size.height<=srect.origin.y+srect.size.height)&&
@@ -223,8 +243,6 @@ int main(int argc,const char*argv[]){
             if([@[@"QREncoder",@"FileZilla",@"ffplay"]containsObject:appName])mayhaveTab=false;
             else cc("can set main",AXUIElementIsAttributeSettable(window,kAXMainAttribute,&mayhaveTab));
             if(mayhaveTab){
-                ProcessSerialNumber psn;
-                cc("get psn",_GetProcessForPID(pid,&psn));
                 cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
                 // WORKAROUND: see FIXME in mouseClickWithButton(...)
                 // BUG FIX: some apps can't receive keystrokes and/or mouseclicks while they're not foreground
@@ -233,6 +251,8 @@ int main(int argc,const char*argv[]){
                 cc("applicationToFrontmost",!applicationToFrontmost(application));
                 // END BUG FIX
                 bool xcode=[@"Xcode" isEqual:appName];
+                ProcessSerialNumber psn;
+                cc("get psn",_GetProcessForPID(pid,&psn));
                 switch(mode){
                     case MODE_TAB_PREV:
                         if(xcode)cc("key ⌘{",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand|kCGEventFlagMaskShift,kVK_ANSI_LeftBracket));
