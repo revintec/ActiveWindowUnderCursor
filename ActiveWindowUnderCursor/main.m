@@ -80,9 +80,11 @@ static inline bool applicationToFrontmost(AXUIElementRef application){
     for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
         CFTypeRef isfg;AXError error=AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg);
         if(!error){
-            if(kCFBooleanTrue!=isfg)
-                cc("set front",AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue));
-            else return true;
+            if(kCFBooleanTrue!=isfg){
+                error=AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue);
+                if(error&&kAXErrorCannotComplete!=error)
+                    cc("set front",error);
+            }else return true;
         }else if(kAXErrorCannotComplete!=error)cc("get front",error);
         [NSThread sleepForTimeInterval:0.1];
     }return false;
