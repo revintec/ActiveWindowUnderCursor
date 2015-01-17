@@ -268,7 +268,11 @@ int main(int argc,const char*argv[]){
                 if((error=AXUIElementCopyAttributeValue(window,kAXCancelButtonAttribute,&button))){
                     if(kAXErrorNoValue!=error)cc("get cancel button",error);
                     cc("get close button",AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,&button));
-                }cc("close window",AXUIElementPerformAction(button,kAXPressAction));
+                }
+                // some window(like Finder's Preview,and Desktop folder) has animation when being closed this way
+                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,1));
+                cc("close window",AXUIElementPerformAction(button,kAXPressAction));
+                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
             }
         }
     }//return 0;
