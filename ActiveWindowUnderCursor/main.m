@@ -76,6 +76,10 @@ BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CG
 //    CFRelease(kd);CFRelease(ku);
 //    return true;
 //}
+/// FIXME known issue: if the application doesn't have a window in the current desktop
+/// but have windows on other desktops, OSX(fuck apple) will automatically switch to that desktop first
+/// which is very intruding for the user but we can't do anything about it
+/// try to change app's main windows's kAXMainAttribute won't work
 static inline bool applicationToFrontmost(AXUIElementRef application){
     for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
         CFTypeRef isfg;AXError error=AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg);
