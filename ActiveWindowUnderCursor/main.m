@@ -11,6 +11,7 @@
 #import <Carbon/Carbon.h>
 
 #define AXMessagingTimeout 0.1
+#define AXWaitApplication [NSThread sleepForTimeInterval:0.18]
 static inline OSStatus _GetProcessForPID(pid_t pid,ProcessSerialNumber*psn){
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -76,22 +77,28 @@ BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CG
 //    CFRelease(kd);CFRelease(ku);
 //    return true;
 //}
+
 /// FIXME known issue: if the application doesn't have a window in the current desktop
 /// but have windows on other desktops, OSX(fuck apple) will automatically switch to that desktop first
 /// which is very intruding for the user but we can't do anything about it
 /// try to change app's main windows's kAXMainAttribute won't work
-static inline bool applicationToFrontmost(AXUIElementRef application){
-    for(int i=0;i<10;++i){// delay at most 10 times to prevent dead loop
-        CFTypeRef isfg;AXError error=AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg);
+
+///  1 successfully put application to front
+///  0 application already front
+/// <0 AXError(currently only -1 when loop ends, all other AXError triggers cc)
+static inline int applicationToFrontmost(AXUIElementRef application){
+    CFTypeRef isfg;AXError error=0;
+    for(int i=0;i<3;++i){// delay at most 3 times to prevent dead loop
+        error=AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg);
         if(!error){
             if(kCFBooleanTrue!=isfg){
                 error=AXUIElementSetAttributeValue(application,kAXFrontmostAttribute,kCFBooleanTrue);
                 if(error&&kAXErrorCannotComplete!=error)
                     cc("set front",error);
-            }else return true;
+            }else return i>0;
         }else if(kAXErrorCannotComplete!=error)cc("get front",error);
         [NSThread sleepForTimeInterval:0.1];
-    }return false;
+    }return -1;
 }
 void filterSheet(AXUIElementRef elem,CFTypeRef*sheet){
     CFTypeRef children;
@@ -170,7 +177,9 @@ int main(int argc,const char*argv[]){
                         cc("fast get application",AXUIElementCopyAttributeValue(application,kAXParentAttribute,(CFTypeRef*)&application));
                         cc("fast get approle",AXUIElementCopyAttributeValue(application,kAXRoleAttribute,&value));
                         cc("fast check approle",!CFEqual(kAXApplicationRole,value));
-                        applicationToFrontmost(application);
+                        int apptofront=applicationToFrontmost(application);
+                        if(apptofront<0)cc("applicationToFrontmost",apptofront);
+                        if(apptofront)AXWaitApplication;
                         ProcessSerialNumber psn;
                         cc("get psn",_GetProcessForPID(pid,&psn));
                         cc("key ⌘N",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_N));
@@ -210,7 +219,9 @@ int main(int argc,const char*argv[]){
                 cc("set main",AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue));
                 // BUG FIX:  some apps can't receive keystrokes and/or mouseclicks while they're not foreground
                 // BUG FIX2: [NSScreen mainScreen] consults the window in focus
-                cc("applicationToFrontmost",!applicationToFrontmost(application));
+                int apptofront=applicationToFrontmost(application);
+                if(apptofront<0)cc("applicationToFrontmost",apptofront);
+                if(apptofront)AXWaitApplication;
                 // END BUG FIX
                 CFTypeRef ref;CGRect wrect,srect,prect;
                 cc("get frame",AXUIElementCopyAttributeValue(window,(CFStringRef)@"AXFrame",&ref));
@@ -252,7 +263,9 @@ int main(int argc,const char*argv[]){
                 // BUG FIX: some apps can't receive keystrokes and/or mouseclicks while they're not foreground
                 // There is, however, another approach: instead of sending CMD-W, click the close button
                 // of the tab instead, and if there is no tabs left, click the close button of the window
-                cc("applicationToFrontmost",!applicationToFrontmost(application));
+                int apptofront=applicationToFrontmost(application);
+                if(apptofront<0)cc("applicationToFrontmost",apptofront);
+                if(apptofront)AXWaitApplication;
                 // END BUG FIX
                 bool xcode=[@"Xcode" isEqual:appName];
                 ProcessSerialNumber psn;
