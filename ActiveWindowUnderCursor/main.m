@@ -11,7 +11,7 @@
 #import <Carbon/Carbon.h>
 
 #define AXMessagingTimeout 0.1
-#define AXWaitApplication [NSThread sleepForTimeInterval:0.18]
+#define AXWaitApplication [NSThread sleepForTimeInterval:0.3]
 static inline OSStatus _GetProcessForPID(pid_t pid,ProcessSerialNumber*psn){
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -88,7 +88,7 @@ BOOL strokeKeycodeWithModifier(ProcessSerialNumber*psn,CGEventFlags modifiers,CG
 /// <0 AXError(currently only -1 when loop ends, all other AXError triggers cc)
 static inline int applicationToFrontmost(AXUIElementRef application){
     CFTypeRef isfg;AXError error=0;
-    for(int i=0;i<3;++i){// delay at most 3 times to prevent dead loop
+    for(int i=0;i<8;++i){// delay at most n times to prevent dead loop
         error=AXUIElementCopyAttributeValue(application,kAXFrontmostAttribute,&isfg);
         if(!error){
             if(kCFBooleanTrue!=isfg){
