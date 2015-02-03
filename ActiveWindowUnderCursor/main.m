@@ -223,22 +223,43 @@ int main(int argc,const char*argv[]){
                 if(apptofront<0)cc("applicationToFrontmost",apptofront);
                 if(apptofront)AXWaitApplication;
                 // END BUG FIX
-                CFTypeRef ref;CGRect wrect,srect,prect;
-                cc("get frame",AXUIElementCopyAttributeValue(window,(CFStringRef)@"AXFrame",&ref));
-                cc("get frame as CGRect",!AXValueGetValue(ref,kAXValueCGRectType,&wrect));
+                CFTypeRef axrect;CGRect wrect,srect,prect;
+                cc("get frame",AXUIElementCopyAttributeValue(window,(CFStringRef)@"AXFrame",&axrect));
+                cc("get frame as CGRect",!AXValueGetValue(axrect,kAXValueCGRectType,&wrect));
                 NSScreen*screen=[NSScreen mainScreen];
                 prect=[screen frame];
                 srect=[screen visibleFrame];
                 srect.origin.y=prect.size.height-prect.origin.y-(srect.size.height+srect.origin.y);
                 ProcessSerialNumber psn;
                 cc("get psn",_GetProcessForPID(pid,&psn));
+                NSString*filepath=[@"~/Scripts/_saved_MPlayerX_AXFrame" stringByExpandingTildeInPath];
+                uint64_t plainpsn=(uint64_t)psn.highLongOfPSN<<32|psn.lowLongOfPSN;
                 if((wrect.origin.x>=0&&wrect.origin.y>=0&&
                    wrect.origin.x+wrect.size.width<=srect.origin.x+srect.size.width&&
                    wrect.origin.y+wrect.size.height<=srect.origin.y+srect.size.height)&&
                    ((wrect.origin.x==srect.origin.x&&wrect.size.width==srect.size.width)||
                    (wrect.origin.y==srect.origin.y&&wrect.size.height==srect.size.height))){
-                    cc("key ⌘1",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_1));
-                }else cc("key ⌘3",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_3));
+                    NSString*saved=[NSString stringWithContentsOfFile:filepath encoding:NSUTF8StringEncoding error:nil];
+                    NSArray*parts=[saved componentsSeparatedByString:@","];
+                    NSString*pppsn=[parts objectAtIndex:0];
+                    if(plainpsn==[pppsn longLongValue]){
+                        // TODO add animation when resizing/moving window
+                        wrect.origin.x=[[parts objectAtIndex:1]doubleValue];
+                        wrect.origin.y=[[parts objectAtIndex:2]doubleValue];
+                        wrect.size.width=[[parts objectAtIndex:3]doubleValue];
+                        wrect.size.height=[[parts objectAtIndex:4]doubleValue];
+//                        axrect=AXValueCreate(kAXValueCGRectType,&wrect);
+//                        cc("set frame",AXUIElementSetAttributeValue(window,(CFStringRef)@"AXFrame",axrect));
+                        AXValueRef origin=AXValueCreate(kAXValueCGPointType,&wrect.origin);
+                        AXValueRef size=AXValueCreate(kAXValueCGSizeType,&wrect.size);
+                        cc("set size",AXUIElementSetAttributeValue(window,kAXSizeAttribute,size));
+                        cc("set origin",AXUIElementSetAttributeValue(window,kAXPositionAttribute,origin));
+                    }else cc("key ⌘1",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_1));
+                }else{
+                    NSString*tosave=[NSString stringWithFormat:@"%llu,%f,%f,%f,%f",plainpsn,wrect.origin.x,wrect.origin.y,wrect.size.width,wrect.size.height];
+                    [tosave writeToFile:filepath atomically:false encoding:NSUTF8StringEncoding error:nil];
+                    cc("key ⌘3",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_3));
+                }
             }else{
                 cc("get zoom button",AXUIElementCopyAttributeValue(window,kAXZoomButtonAttribute,(CFTypeRef*)&window));
                 AXUIElementRef system=AXUIElementCreateSystemWide();
