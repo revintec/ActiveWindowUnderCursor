@@ -163,7 +163,7 @@ int main(int argc,const char*argv[]){
            (system,point.x,point.y,&window,false,0,0,0));
         pid_t pid;cc("AXUIElementGetPid",AXUIElementGetPid(window,&pid));
         NSRunningApplication*ra=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
-        cc("get NSRunningApplication",ra==nil);
+        cc("get NSRunningApplicationUnderCursor",ra==nil);
         NSString*appName=[ra localizedName];
         if(mode==MODE_WIN_ZOOM&&[@"Finder"isEqual:appName]){
             CFTypeRef value;
