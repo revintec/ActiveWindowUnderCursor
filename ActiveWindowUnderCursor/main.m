@@ -111,6 +111,7 @@ void filterSheet(AXUIElementRef elem,CFTypeRef*sheet){
             return filterSheet(*sheet=child,sheet);
     }
 }
+AXUIElementRef axsystem;
 bool strokeCancel(AXUIElementRef elem){
     CFTypeRef children;AXError error=AXUIElementCopyAttributeValue(elem,kAXChildrenAttribute,&children);
     if(!error){
@@ -122,10 +123,9 @@ bool strokeCancel(AXUIElementRef elem){
                 if(kAXErrorAttributeUnsupported!=error)cc("filter cancel title",error);
                 if(error)continue;
                 if(CFEqual(@"Cancel",title)||CFEqual(@"取消",title)){
-                    AXUIElementRef system=AXUIElementCreateSystemWide();
-                    cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,1));
+                    cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(axsystem,1));
                     cc("press cancel",AXUIElementPerformAction(child,kAXPressAction));
-                    cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
+                    cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(axsystem,AXMessagingTimeout));
                     return true;
                 }// continue
             }else if(strokeCancel(child))return true;
@@ -156,11 +156,11 @@ int main(int argc,const char*argv[]){
         NSPoint point=[NSEvent mouseLocation];
         cc("coordinate conversion",!carbonScreenPointFromCocoaScreenPoint(&point));
         AXUIElementRef web=nil,window,application;
-        AXUIElementRef system=AXUIElementCreateSystemWide();
-        cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
+        axsystem=AXUIElementCreateSystemWide();
+        cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(axsystem,AXMessagingTimeout));
         extern AXError _AXUIElementCopyElementAtPositionIncludeIgnored(AXUIElementRef root,float x,float y,AXUIElementRef*elem,long includingIgnored,long rcx,long r8,long r9);
         cc("AXUIElementCopyElementAtPositionEx",_AXUIElementCopyElementAtPositionIncludeIgnored
-           (system,point.x,point.y,&window,false,0,0,0));
+           (axsystem,point.x,point.y,&window,false,0,0,0));
         pid_t pid;cc("AXUIElementGetPid",AXUIElementGetPid(window,&pid));
         NSRunningApplication*ra=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         cc("get NSRunningApplicationUnderCursor",ra==nil);
@@ -177,12 +177,13 @@ int main(int argc,const char*argv[]){
                         cc("fast get application",AXUIElementCopyAttributeValue(application,kAXParentAttribute,(CFTypeRef*)&application));
                         cc("fast get approle",AXUIElementCopyAttributeValue(application,kAXRoleAttribute,&value));
                         cc("fast check approle",!CFEqual(kAXApplicationRole,value));
-                        int apptofront=applicationToFrontmost(application);
-                        if(apptofront<0)cc("applicationToFrontmost",apptofront);
-                        if(apptofront)AXWaitApplication;
-                        ProcessSerialNumber psn;
-                        cc("get psn",_GetProcessForPID(pid,&psn));
-                        cc("key ⌘N",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_N));
+                        system("open -R ~/Desktop");
+//                        int apptofront=applicationToFrontmost(application);
+//                        if(apptofront<0)cc("applicationToFrontmost",apptofront);
+//                        if(apptofront)AXWaitApplication;
+//                        ProcessSerialNumber psn;
+//                        cc("get psn",_GetProcessForPID(pid,&psn));
+//                        cc("key ⌘N",!strokeKeycodeWithModifier(&psn,kCGEventFlagMaskCommand,kVK_ANSI_N));
                         return 0;
                     }
                 }
@@ -262,8 +263,7 @@ int main(int argc,const char*argv[]){
                 }
             }else{
                 cc("get zoom button",AXUIElementCopyAttributeValue(window,kAXZoomButtonAttribute,(CFTypeRef*)&window));
-                AXUIElementRef system=AXUIElementCreateSystemWide();
-                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,1));
+                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(axsystem,1));
                 AXError error=AXUIElementPerformAction(window,(CFStringRef)@"AXZoomWindow");
                 if(error){
                     if(error!=kAXErrorActionUnsupported)
@@ -272,7 +272,7 @@ int main(int argc,const char*argv[]){
                     cc("test srole",!CFEqual(kAXZoomButtonSubrole,srole));
                     cc("zoom window",AXUIElementPerformAction(window,kAXPressAction));
                 }
-                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
+                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(axsystem,AXMessagingTimeout));
             }
         }else{
             Boolean mayhaveTab;
@@ -330,9 +330,9 @@ int main(int argc,const char*argv[]){
                     cc("get close button",AXUIElementCopyAttributeValue(window,kAXCloseButtonAttribute,&button));
                 }
                 // some window(like Finder's Preview,and Desktop folder) has animation when being closed this way
-                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,1));
+                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(axsystem,1));
                 cc("close window",AXUIElementPerformAction(button,kAXPressAction));
-                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(system,AXMessagingTimeout));
+                cc("AXUIElementSetMessagingTimeout",AXUIElementSetMessagingTimeout(axsystem,AXMessagingTimeout));
             }
         }
     }//return 0;
